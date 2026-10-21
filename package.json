@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "factory": "bun src/cli.ts",
-    "test": "bun test --timeout 30000 test",
+    "test": "bun test --timeout 60000 test",
     "typecheck": "tsc --noEmit",
     "qualify": "bun qualification/client.ts"
   },

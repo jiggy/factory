@@ -1,13 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { readFile, readdir, rename, rm, rmdir, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { AttemptObservation, Prepared, PrepareRequest } from "@jigging/jig/client";
 import { Controller, type ExecutionClient } from "../src/controller.ts";
-import { scanBoard } from "../src/board.ts";
+import { observeBoard } from "../src/board.ts";
 import { diagnostic } from "../src/errors.ts";
-import { digest, record } from "../src/files.ts";
-import { Store } from "../src/store.ts";
+import { digest, exists, record } from "../src/files.ts";
 
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
@@ -77,13 +76,78 @@ async function fixture() {
 }
 
 describe("file-native controller (mock host, not host qualification)", () => {
-  test("plain Markdown receives a stable identity without a status field", async () => {
+  test("status observes plain Markdown without assigning an identity or writing state", async () => {
     const { root, controller } = await fixture();
+    const before = await readFile(join(root, "board/ready/task.md"), "utf8");
+    const stateBefore = await readdir(join(root, ".factory"));
     const [first] = await controller.status();
     const [second] = await controller.status();
-    expect(first!.id).toBe(second!.id);
+    expect(first!.id).toBeNull();
+    expect(second!.id).toBeNull();
     expect(first!.lane).toBe("ready");
+    expect(first!.attention).toContain("reconcile");
+    expect(await readFile(join(root, "board/ready/task.md"), "utf8")).toBe(before);
+    expect(await readdir(join(root, ".factory"))).toEqual(stateBefore);
+  });
+
+  test("explicit reconciliation assigns a stable identity without dispatch", async () => {
+    const { root, controller, host } = await fixture();
+    const [first] = await controller.reconcile();
+    const [second] = await controller.reconcile();
+    expect(typeof first!.id).toBe("string");
+    expect(first!.id).toBe(second!.id);
+    expect(host.submissions).toBe(0);
+    expect(await controller.store.transactions()).toEqual([]);
     expect(await readFile(join(root, "board/ready/task.md"), "utf8")).not.toContain("status:");
+  });
+
+  test("status does not create missing private application state", async () => {
+    const { root, controller } = await fixture();
+    await rm(join(root, ".factory"), { recursive: true });
+    expect((await controller.status())[0]!.id).toBeNull();
+    expect(await exists(join(root, ".factory"))).toBe(false);
+  });
+
+  test("status does not initialize a workspace or repair missing lanes", async () => {
+    const root = resolve(".tmp", `uninitialized-${randomUUID()}`);
+    roots.push(root);
+    const controller = new Controller(root, () => { throw new Error("Observation must not create a host client"); });
+    await expect(controller.status()).rejects.toMatchObject({ code: "WORKSPACE_NOT_INITIALIZED" });
+    expect(await exists(root)).toBe(false);
+    await controller.initialize();
+    await rmdir(join(root, "board/blocked"));
+    await expect(controller.status()).rejects.toMatchObject({ code: "INCOMPLETE_BOARD" });
+    expect(await exists(join(root, "board/blocked"))).toBe(false);
+  });
+
+  test("status remains available while another controller owns mutation", async () => {
+    const { root, controller, host } = await fixture();
+    await controller.reconcile();
+    await controller.store.locked(async () => {
+      const lock = await readFile(join(root, ".factory/controller.lock"), "utf8");
+      expect((await controller.status())[0]!.lane).toBe("ready");
+      expect(await readFile(join(root, ".factory/controller.lock"), "utf8")).toBe(lock);
+    });
+    expect(host.submissions).toBe(0);
+  });
+
+  test("active work is observable without suggesting it has lost its owner", async () => {
+    const { controller, host } = await fixture();
+    host.duringRun = async () => {
+      const [card] = await controller.status();
+      expect(card!.lane).toBe("doing");
+      expect(card!.attention).toContain("Controller owns");
+    };
+    await controller.run();
+  });
+
+  test("reconciliation validates the full intake plan before writing card identities", async () => {
+    const { root, controller } = await fixture();
+    const original = await readFile(join(root, "board/ready/task.md"), "utf8");
+    await writeFile(join(root, "board/review/unidentified.md"), "# Not an accepted review transition\n");
+    expect((await controller.status()).find(card => card.name === "unidentified.md")!.attention).toContain("Unidentified");
+    await expect(controller.reconcile()).rejects.toMatchObject({ code: "UNRECONCILED_CARD" });
+    expect(await readFile(join(root, "board/ready/task.md"), "utf8")).toBe(original);
   });
 
   test("persists full Prepared and task in private storage BEFORE submit", async () => {
@@ -93,7 +157,7 @@ describe("file-native controller (mock host, not host qualification)", () => {
       expect(transaction!.prepared).toEqual(host.prepared);
       expect(transaction!.task.text).toContain("Keep unrelated");
       expect(transaction!.task.digest).toBe(digest(transaction!.task.text));
-      expect((await scanBoard(root))[0]!.lane).toBe("doing");
+      expect((await observeBoard(root))[0]!.lane).toBe("doing");
     };
     const result = await controller.run();
     expect(result.disposition).toBe("review");
@@ -108,8 +172,8 @@ describe("file-native controller (mock host, not host qualification)", () => {
     const { controller } = await fixture();
     await controller.run();
     const [card] = await controller.status();
-    await expect(controller.accept(card!.id, "")).rejects.toMatchObject({ code: "ACCEPTANCE_NOTE_REQUIRED" });
-    await controller.accept(card!.id, "Reviewed packet; accepted this outcome.");
+    await expect(controller.accept(card!.id!, "")).rejects.toMatchObject({ code: "ACCEPTANCE_NOTE_REQUIRED" });
+    await controller.accept(card!.id!, "Reviewed packet; accepted this outcome.");
     expect((await controller.status())[0]!.lane).toBe("done");
   });
 
@@ -119,7 +183,7 @@ describe("file-native controller (mock host, not host qualification)", () => {
     await rename(join(root, "board/review/task.md"), join(root, "board/done/task.md"));
     const [card] = await controller.status();
     expect(card!.attention).toContain("cannot manufacture");
-    await expect(controller.accept(card!.id, "Forged move")).rejects.toMatchObject({ code: "NOT_REVIEWABLE" });
+    await expect(controller.accept(card!.id!, "Forged move")).rejects.toMatchObject({ code: "NOT_REVIEWABLE" });
   });
 
   test("a changed running card never inherits the old result", async () => {
@@ -132,7 +196,7 @@ describe("file-native controller (mock host, not host qualification)", () => {
     const [card] = await controller.status();
     expect(card!.lane).toBe("doing");
     expect(card!.attention).toContain("edited");
-    await expect(controller.accept(card!.id, "Accept stale evidence")).rejects.toMatchObject({ code: "NOT_REVIEWABLE" });
+    await expect(controller.accept(card!.id!, "Accept stale evidence")).rejects.toMatchObject({ code: "NOT_REVIEWABLE" });
   });
 
   test("an edited review card cannot be accepted without new work", async () => {
@@ -141,7 +205,7 @@ describe("file-native controller (mock host, not host qualification)", () => {
     const path = join(root, "board/review/task.md");
     await writeFile(path, `${await readFile(path, "utf8")}\nNew intent.\n`);
     const [card] = await controller.status();
-    await expect(controller.accept(card!.id, "accept")).rejects.toMatchObject({ code: "NOT_REVIEWABLE" });
+    await expect(controller.accept(card!.id!, "accept")).rejects.toMatchObject({ code: "NOT_REVIEWABLE" });
   });
 
   test("lost submission reply remains recoverable without resubmission", async () => {
@@ -188,14 +252,14 @@ describe("file-native controller (mock host, not host qualification)", () => {
     await rename(join(root, "board/review/task.md"), join(root, "board/ready/task.md"));
     const [card] = await controller.status();
     await expect(controller.run()).rejects.toMatchObject({ code: "EXPLICIT_REQUEUE_REQUIRED" });
-    await controller.requeue(card!.id, "Authorize a new bounded attempt.");
+    await controller.requeue(card!.id!, "Authorize a new bounded attempt.");
     await controller.run();
     expect(host.submissions).toBe(2);
   });
 
   test("duplicate card identity blocks dispatch", async () => {
     const { root, controller, host } = await fixture();
-    await controller.status();
+    await controller.reconcile();
     await writeFile(join(root, "board/inbox/copy.md"), await readFile(join(root, "board/ready/task.md")));
     await expect(controller.run()).rejects.toMatchObject({ code: "DUPLICATE_CARD" });
     expect(host.submissions).toBe(0);
@@ -231,7 +295,7 @@ describe("file-native controller (mock host, not host qualification)", () => {
   test("recovery finishes a recorded acceptance without executing again", async () => {
     const { controller, host } = await fixture();
     const { attemptId } = await controller.run();
-    const [card] = await scanBoard(controller.root);
+    const [card] = await observeBoard(controller.root);
     await controller.store.save(attemptId, "acceptance.json", { taskDigest: card!.digest, note: "Human accepted before crash." });
     await controller.recover();
     expect((await controller.status())[0]!.lane).toBe("done");
@@ -242,7 +306,7 @@ describe("file-native controller (mock host, not host qualification)", () => {
     const { controller, host } = await fixture();
     await controller.run();
     const [card] = await controller.status();
-    await controller.requeue(card!.id, "New attempt");
+    await controller.requeue(card!.id!, "New attempt");
     host.failSubmit = true;
     await expect(controller.run()).rejects.toThrow();
     host.failSubmit = false;
@@ -276,5 +340,25 @@ describe("file-native controller (mock host, not host qualification)", () => {
     const next = { ...first!, sequence: 2, attemptId: randomUUID(), createdAt: "1970-01-01T00:00:00.000Z" };
     await controller.store.persist(next);
     expect((await controller.store.transactions()).at(-1)!.attemptId).toBe(next.attemptId);
+  });
+
+  test("diagnostic facts exclude prepared tickets and captured task text", async () => {
+    const { controller } = await fixture();
+    await controller.run();
+    const facts = await controller.store.facts();
+    expect(facts).toHaveLength(1);
+    expect(JSON.stringify(facts)).not.toContain("PRIVATE-TICKET");
+    expect(JSON.stringify(facts)).not.toContain("Keep unrelated");
+    expect(JSON.stringify(facts)).not.toContain("canonicalRequest");
+  });
+
+  test("new unrelated intake does not prevent acceptance of an existing review", async () => {
+    const { root, controller } = await fixture();
+    await controller.run();
+    const [card] = await controller.status();
+    await writeFile(join(root, "board/inbox/new.md"), "# New, unrelated intent\n");
+    await controller.accept(card!.id!, "Accepted existing captured revision.");
+    expect((await controller.status()).find(row => row.id === card!.id)!.lane).toBe("done");
+    expect(await readFile(join(root, "board/inbox/new.md"), "utf8")).toBe("# New, unrelated intent\n");
   });
 });

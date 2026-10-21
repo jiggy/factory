@@ -119,7 +119,8 @@ try {
   assert.equal((await controller.run()).disposition, "review");
   const [card] = await controller.status();
   assert.equal(card?.lane, "review");
-  await controller.accept(card!.id, "Accepted synthetic qualification packet; no software-quality claim.");
+  assert.ok(card?.id);
+  await controller.accept(card.id, "Accepted synthetic qualification packet; no software-quality claim.");
   assert.equal((await controller.status())[0]?.lane, "done");
   checks.push("real controller: Markdown → prepared transaction → Run → review → explicit acceptance");
   await record(join(evidence, "report.json"), report("passed"));

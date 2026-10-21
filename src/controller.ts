@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { createAttemptClient, type AttemptSubmission } from "@jigging/jig/client";
-import { cardPath, lanes, moveCard, scanBoard, type Card } from "./board.ts";
+import { cardPath, lanes, moveCard, observeBoard, reconcileBoard } from "./board.ts";
+import { diagnoseBoard, latestByTask, type BoardRow, type Decision } from "./analysis.ts";
 import { configuration } from "./config.ts";
 import { digest, directory, textFile } from "./files.ts";
 import { FactoryError } from "./errors.ts";
@@ -9,8 +10,6 @@ import { Store, type Transaction } from "./store.ts";
 
 export type ExecutionClient = ReturnType<typeof createAttemptClient>;
 export type ClientFactory = (project: string) => ExecutionClient;
-interface Decision { taskDigest: string; disposition: "review" | "blocked"; reason: string }
-export interface BoardRow { id: string; name: string; lane: string; attention?: string }
 
 function approval(value: unknown): string {
   if (!value || typeof value !== "object" || Array.isArray(value) ||
@@ -32,52 +31,27 @@ export class Controller {
   }
 
   private async latest(): Promise<Map<string, Transaction>> {
-    const result = new Map<string, Transaction>();
-    for (const transaction of await this.store.transactions()) result.set(transaction.task.id, transaction);
-    return result;
-  }
-
-  private async attention(card: Card, transaction: Transaction | undefined): Promise<string | undefined> {
-    if (!transaction) return ["inbox", "ready"].includes(card.lane) ? undefined : "No committed attempt supports this lane.";
-    const id = transaction.attemptId;
-    if (!(await this.store.has(id, "disposition.json"))) {
-      return "Attempt requires observational recovery before any new execution.";
-    }
-    if (transaction.task.digest !== card.digest) return "Card edited since execution; retain old evidence and explicitly requeue.";
-    const decision = await this.store.read<Decision>(id, "disposition.json");
-    if (card.lane === "done") {
-      if (!(await this.store.has(id, "acceptance.json"))) return "A manual move cannot manufacture human acceptance.";
-      return undefined;
-    }
-    if (card.lane !== decision.disposition && !["inbox", "ready", "blocked"].includes(card.lane)) {
-      return "Manual lane change requires reconciliation; execution and acceptance facts are unchanged.";
-    }
-    if (card.lane === "ready") return "Previous attempt exists. Explicitly requeue before executing again.";
-    return undefined;
+    return latestByTask(await this.store.transactions());
   }
 
   async status(): Promise<BoardRow[]> {
+    const [cards, attempts, active] = await Promise.all([
+      observeBoard(this.root), this.store.facts(), this.store.activeController(),
+    ]);
+    return diagnoseBoard(cards, attempts, active);
+  }
+
+  async reconcile(): Promise<BoardRow[]> {
     return this.store.locked(async () => {
-      const cards = await scanBoard(this.root, true);
-      const latest = await this.latest();
-      const rows: BoardRow[] = [];
-      for (const card of cards) {
-        const attention = await this.attention(card, latest.get(card.id));
-        rows.push({ id: card.id, name: card.name, lane: card.lane, ...(attention ? { attention } : {}) });
-      }
-      for (const transaction of latest.values()) {
-        if (!cards.some(card => card.id === transaction.task.id)) {
-          rows.push({ id: transaction.task.id, name: transaction.task.name, lane: "missing", attention: "Task file is missing; attempt evidence is retained. Use recover before new work." });
-        }
-      }
-      return rows;
+      await reconcileBoard(this.root);
+      return this.status();
     });
   }
 
   /** One ready card, one foreground episode. Never retries or automatically loops. */
   async run(cardId?: string, signal?: AbortSignal): Promise<{ attemptId: string; disposition: string }> {
     return this.store.locked(async () => {
-      const cards = await scanBoard(this.root, true);
+      const cards = await reconcileBoard(this.root);
       const transactions = await this.store.transactions();
       for (const transaction of transactions) {
         if (!(await this.store.has(transaction.attemptId, "disposition.json"))) {
@@ -195,7 +169,7 @@ export class Controller {
   private async applyDisposition(transaction: Transaction, decision: Decision): Promise<string> {
     const latest = (await this.latest()).get(transaction.task.id);
     if (latest?.attemptId !== transaction.attemptId) return "superseded";
-    const cards = await scanBoard(this.root);
+    const cards = await observeBoard(this.root);
     const card = cards.find(item => item.id === transaction.task.id);
     if (!card || card.digest !== transaction.task.digest) {
       await this.store.event(transaction.attemptId, "revision-conflict", { reason: card ? "changed" : "missing" });
@@ -245,7 +219,7 @@ export class Controller {
   async accept(cardId: string, note: string): Promise<void> {
     if (!note.trim()) throw new FactoryError("ACCEPTANCE_NOTE_REQUIRED", "Record the human acceptance decision with a nonempty note.");
     await this.store.locked(async () => {
-      const card = (await scanBoard(this.root)).find(item => item.id === cardId);
+      const card = (await observeBoard(this.root)).find(item => item.id === cardId);
       const transaction = (await this.latest()).get(cardId);
       if (!card || card.lane !== "review" || !transaction ||
           card.digest !== transaction.task.digest || !(await this.store.has(transaction.attemptId, "disposition.json"))) {
@@ -263,7 +237,7 @@ export class Controller {
   async requeue(cardId: string, note: string): Promise<void> {
     if (!note.trim()) throw new FactoryError("REQUEUE_NOTE_REQUIRED", "Record why a new execution is authorized.");
     await this.store.locked(async () => {
-      const card = (await scanBoard(this.root, true)).find(item => item.id === cardId);
+      const card = (await observeBoard(this.root)).find(item => item.id === cardId);
       const transaction = (await this.latest()).get(cardId);
       if (!card || !transaction || !(await this.store.has(transaction.attemptId, "disposition.json"))) {
         throw new FactoryError("RECOVERY_REQUIRED", "Reconcile the existing attempt before authorizing new work.");

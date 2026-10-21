@@ -8,6 +8,7 @@ const help = `Factory — file-native, agent-directed work
 
   bun run factory init WORKSPACE
   bun run factory status WORKSPACE
+  bun run factory reconcile WORKSPACE
   bun run factory run WORKSPACE [CARD_ID]
   bun run factory recover WORKSPACE
   bun run factory cancel WORKSPACE CARD_ID
@@ -15,6 +16,7 @@ const help = `Factory — file-native, agent-directed work
   bun run factory requeue WORKSPACE CARD_ID "new-execution authorization"
 
 Write Markdown in board/inbox, move authorized work to ready.
+Status is read-only. Reconcile assigns identities without starting work.
 Configure source selection in WORKSPACE/factory.json and review the Jig project.
 Acceptance never merges or releases code. Recovery never replays execution.
 Set JIG_EXECUTABLE to an installed host path, or run with node_modules/.bin in PATH.
@@ -38,6 +40,7 @@ export async function main(args: string[]) {
     }
     console.log("Workspace created. Set exact source file selection in factory.json; write Markdown in board/inbox.");
   } else if (command === "status") console.log(JSON.stringify(await controller.status(), null, 2));
+  else if (command === "reconcile") console.log(JSON.stringify(await controller.reconcile(), null, 2));
   else if (command === "run") {
     const abort = new AbortController();
     const stop = () => abort.abort();
