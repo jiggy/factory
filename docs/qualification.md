@@ -8,9 +8,12 @@ bun run test
 ```
 
 Tests use a clearly labelled fake execution client and scripted Flow contexts.
-They exercise the controller's own durability ordering, card revisions, explicit
-acceptance, duplicate claims, recovery without submission, adaptive paths,
-out-of-set rejection, finite budgets and candidate path validation.
+Pure analysis tests exercise captured board/attempt facts without I/O. Controller
+tests verify read-only status (including active ownership and missing state),
+explicit identity reconciliation, durability ordering, card revisions, human
+acceptance, duplicate claims and recovery without submission. Scripted Flow
+tests cover adaptive paths, out-of-set rejection, finite budgets and candidate
+path validation.
 They do not establish native containment or real model quality.
 
 The test timeout accommodates filesystem sync costs on slow worktrees; it does
