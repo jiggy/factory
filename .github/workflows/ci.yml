@@ -1,0 +1,132 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  format:
+    if: >-
+      (github.event_name == 'push' && github.ref_type == 'branch') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.patch.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      - run: bun run format
+      - name: Export formatting patch
+        id: patch
+        run: |
+          if ! git diff --quiet; then
+            mkdir -p "$RUNNER_TEMP/format-patch"
+            git diff --binary > "$RUNNER_TEMP/format-patch/format.patch"
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: steps.patch.outputs.changed == 'true'
+        with:
+          name: format-patch
+          path: ${{ runner.temp }}/format-patch/format.patch
+          retention-days: 1
+
+  apply-formatting:
+    needs: format
+    if: needs.format.outputs.changed == 'true'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: format-patch
+          path: ${{ runner.temp }}/format-patch
+      # This job only applies data and runs Git. Never run package scripts,
+      # install dependencies, or execute files from the candidate checkout here.
+      - name: Commit formatting patch
+        id: commit
+        env:
+          TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          git config core.hooksPath /dev/null
+          git apply --index "$RUNNER_TEMP/format-patch/format.patch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Push and PR runs produce the same commit when formatting the same head.
+          export GIT_AUTHOR_DATE="$(git show -s --format=%cI HEAD)"
+          export GIT_COMMITTER_DATE="$GIT_AUTHOR_DATE"
+          git commit -m 'style: apply Biome formatting'
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: [format, apply-formatting]
+    if: >-
+      always() && !cancelled() &&
+      (needs.format.result == 'success' || needs.format.result == 'skipped') &&
+      (needs.apply-formatting.result == 'success' || needs.apply-formatting.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Include formatting commit in validation
+        if: needs.apply-formatting.outputs.sha != ''
+        env:
+          FORMATTED_SHA: ${{ needs.apply-formatting.outputs.sha }}
+        run: |
+          git config core.hooksPath /dev/null
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge --no-edit "$FORMATTED_SHA"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      - run: bun run format:check
+      - run: bun run check
+      - run: bun run test
+      - run: bun run demo
+
+  report-formatting-check:
+    needs: [apply-formatting, verify]
+    if: always() && needs.apply-formatting.outputs.sha != ''
+    permissions:
+      checks: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # No candidate checkout or candidate commands in this write-capable job.
+      - name: Report validation on formatting commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORMATTED_SHA: ${{ needs.apply-formatting.outputs.sha }}
+          RESULT: ${{ needs.verify.result }}
+        run: |
+          conclusion="$RESULT"
+          if [ "$conclusion" = skipped ]; then
+            conclusion=failure
+          fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" \
+            -f name=verify -f head_sha="$FORMATTED_SHA" \
+            -f status=completed -f conclusion="$conclusion" \
+            -f details_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

@@ -15,6 +15,7 @@
     "@jigging/agent-acp": "0.1.0-alpha.11"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.12",
     "@types/bun": "1.3.3",
     "typescript": "5.7.3"
   }
