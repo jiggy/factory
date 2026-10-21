@@ -1,0 +1,9 @@
+{
+  "name": "@factory/qualification-iterate",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@jigging/flow": "0.1.0-alpha.15"
+  }
+}

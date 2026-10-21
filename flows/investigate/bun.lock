@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "@factory/investigate",
+      "dependencies": {
+        "@jigging/flow": "0.1.0-alpha.15",
+      },
+    },
+  },
+  "packages": {
+    "@jigging/flow": ["@jigging/flow@0.1.0-alpha.15", "", {}, "sha512-HsgEO79BY/DMOFSlqlN3z/3+HhcDhzQPBv+G8Rh3NMNvaqXVwrffSIdbqoaCUhxzRf3xH8BdLZ9qwJARWdBRmQ=="],
+  }
+}
