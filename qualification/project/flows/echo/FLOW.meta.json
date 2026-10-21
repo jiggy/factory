@@ -1,0 +1,5 @@
+{
+  "name": "qualification-echo",
+  "description": "Synthetic result and checkpoint production for installed-client tests.",
+  "uses": { "progress": { "contract": "./contracts/checkpoint/contract.json" } }
+}

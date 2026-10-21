@@ -1,0 +1,8 @@
+{
+  "name": "qualification-iteration",
+  "description": "Synthetic candidate-evaluation-revision-evaluation in one finite Run.",
+  "uses": {
+    "produce": {},
+    "evaluate": { "contract": "./contracts/evaluation/contract.json" }
+  }
+}

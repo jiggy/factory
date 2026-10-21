@@ -1,0 +1,9 @@
+{
+  "name": "factory-public-host-qualification",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@jigging/jig": "0.1.0-alpha.37",
+    "@jigging/flow": "0.1.0-alpha.15"
+  }
+}

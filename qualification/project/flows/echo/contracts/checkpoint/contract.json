@@ -1,0 +1,69 @@
+{
+  "$schema": "https://flow.jig.md/schemas/invocation-contract-0.schema.json",
+  "id": "https://jig.md/contracts/run-checkpoint",
+  "version": "0.1.0",
+  "input": {
+    "$ref": "#/$defs/Input"
+  },
+  "result": {
+    "type": "object",
+    "properties": {
+      "outcome": {
+        "const": "done"
+      },
+      "output": {
+        "$ref": "#/$defs/Receipt"
+      }
+    },
+    "required": ["outcome", "output"],
+    "additionalProperties": false
+  },
+  "$defs": {
+    "Input": {
+      "type": "object",
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "evidence": {},
+        "files": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 1048576
+          },
+          "maxProperties": 64
+        },
+        "artifacts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "maxProperties": 8
+        }
+      },
+      "required": ["sequence", "evidence", "files"],
+      "additionalProperties": false
+    },
+    "Receipt": {
+      "type": "object",
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "digest": {
+          "type": "string",
+          "maxLength": 71
+        }
+      },
+      "required": ["sequence", "digest"],
+      "additionalProperties": false
+    }
+  }
+}

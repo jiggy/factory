@@ -1,0 +1,5 @@
+{
+  "family": "bun-typescript",
+  "test": ["test/project.test.ts"],
+  "collect": ["dist", "reports"]
+}
