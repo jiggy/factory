@@ -17,6 +17,8 @@ This is not yet a completed replacement for Jig's old factory example.
 
 Use Bun 1.3.3+ and a host supported by Jig. All SDK/host dependencies are pinned
 public packages; no sibling checkout or private Jig API is used.
+Each importing Flow also owns its SDK declaration and frozen lock. Jig prepares
+those dependencies during review; no per-Flow installation is needed to run it.
 
 ```sh
 bun install --frozen-lockfile --backend copyfile --ignore-scripts
