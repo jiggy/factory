@@ -149,7 +149,9 @@ When the user requests a durable behavior change, record it here or in the relev
 
 ## Child DOX Index
 
-This project is not yet indexed. Before continuing you must scan the project, build the DOX tree and replace this message with the actual index. Go deep and scan files recursively to properly evaluate complexity and create nested DOX files where needed.
+This root owns `src/`, `flows/`, `bindings/`, `recipes/`, `test/`, `docs/`,
+`.github/` and root development tooling. Their responsibilities are listed above.
+The qualification subtree has additional public-host evidence requirements.
 
 - [qualification/AGENTS.md](qualification/AGENTS.md) — Installed public-client
   host qualification, distinct from unit mocks and live-Agent evidence.
