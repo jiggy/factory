@@ -51,8 +51,10 @@ development techniques; deterministic boundaries keep work under operator contro
 - Development closeout: slice completed work into coherent commits and push the
   topic branch to the source remote after relevant verification. Do this by
   default, using native SSH without transport overrides or another permission
-  question. This does not authorize landing on shared branches, force-pushing,
-  or releasing; it does not grant Git authority to the running factory.
+  question. Non-`main` topic branches may be force-pushed after rebasing, using
+  `--force-with-lease` bound to the freshly verified remote head. Never force-push
+  `main`. This does not authorize landing on shared branches or releasing; it
+  does not grant Git authority to the running factory.
 
 ## Verification
 
