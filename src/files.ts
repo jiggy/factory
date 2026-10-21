@@ -9,6 +9,10 @@ export const isMissing = (error: unknown) => (error as NodeJS.ErrnoException)?.c
 
 export async function directory(path: string, privateMode = false): Promise<void> {
   await mkdir(path, { recursive: true, mode: privateMode ? 0o700 : 0o755 });
+  await requireDirectory(path, privateMode);
+}
+
+export async function requireDirectory(path: string, privateMode = false): Promise<void> {
   const stat = await lstat(path);
   if (!stat.isDirectory() || stat.isSymbolicLink()) {
     throw new FactoryError("UNSAFE_PATH", "Expected a real directory, not a link or special file.");

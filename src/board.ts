@@ -1,25 +1,32 @@
 import { randomUUID } from "node:crypto";
 import { lstat, rename } from "node:fs/promises";
 import { join } from "node:path";
-import { digest, directory, entries, exists, replaceText, syncDirectory, textFile } from "./files.ts";
+import { digest, entries, exists, replaceText, requireDirectory, syncDirectory, textFile } from "./files.ts";
 import { FactoryError } from "./errors.ts";
+import { planIntake } from "./analysis.ts";
 
 export const lanes = ["inbox", "ready", "doing", "review", "blocked", "done"] as const;
 export type Lane = typeof lanes[number];
-export interface Card { id: string; lane: Lane; name: string; text: string; digest: string }
+export interface ObservedCard { id: string | null; lane: Lane; name: string; text: string; digest: string }
+export interface Card extends ObservedCard { id: string }
 const identity = /^<!-- factory:([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}) -->\r?\n/;
 const marker = "<!-- factory:";
 
 export const cardPath = (root: string, card: Pick<Card, "lane" | "name">) => join(root, "board", card.lane, card.name);
 
-export async function scanBoard(root: string, assignIdentities = false): Promise<Card[]> {
-  await directory(join(root, "board"));
-  const cards: Card[] = [];
+/** Observation never creates directories, assigns IDs or acquires a write lock. */
+export async function observeBoard(root: string): Promise<ObservedCard[]> {
+  if (!(await exists(join(root, "board")))) {
+    throw new FactoryError("WORKSPACE_NOT_INITIALIZED", "Initialize the workspace before observing its board.");
+  }
+  await requireDirectory(join(root, "board"));
+  const cards: ObservedCard[] = [];
   const ids = new Set<string>();
   const names = new Set<string>();
   for (const lane of lanes) {
     const path = join(root, "board", lane);
-    await directory(path);
+    if (!(await exists(path))) throw new FactoryError("INCOMPLETE_BOARD", "A board lane is missing. Use init to restore the workspace structure.");
+    await requireDirectory(path);
     for (const name of await entries(path)) {
       if (name.startsWith(".") || !name.endsWith(".md")) continue;
       if (/[\u0000-\u001f\u007f]/.test(name)) {
@@ -30,33 +37,41 @@ export async function scanBoard(root: string, assignIdentities = false): Promise
       if (!stat.isFile() || stat.isSymbolicLink()) {
         throw new FactoryError("UNSAFE_CARD", "Board cards must be regular Markdown files, not links or directories.");
       }
-      let text = await textFile(fullPath, 131_072);
-      let match = identity.exec(text);
+      const text = await textFile(fullPath, 131_072);
+      const match = identity.exec(text);
       if (!match && text.startsWith(marker)) {
         throw new FactoryError("INVALID_CARD_ID", "A card has a malformed factory identity. Restore its original identity.");
       }
-      if (!match && assignIdentities && (lane === "inbox" || lane === "ready")) {
-        if (!text.trim()) throw new FactoryError("EMPTY_CARD", "Write task intent before submitting a card.");
-        text = `<!-- factory:${randomUUID()} -->\n${text}`;
-        await replaceText(fullPath, text);
-        match = identity.exec(text);
-      }
-      if (!match) {
-        throw new FactoryError("UNRECONCILED_CARD", "A card needs intake reconciliation in inbox or ready before it can enter an execution lane.");
-      }
-      const id = match[1]!;
+      const id = match?.[1] ?? null;
       const normalized = name.normalize("NFC").toLowerCase();
-      if (ids.has(id) || names.has(normalized)) {
+      if ((id !== null && ids.has(id)) || names.has(normalized)) {
         throw new FactoryError("DUPLICATE_CARD", "Duplicate card identities or filenames exist across the board. Resolve the copies before execution.");
       }
-      ids.add(id); names.add(normalized);
+      if (id !== null) ids.add(id);
+      names.add(normalized);
       cards.push({ id, lane, name, text, digest: digest(text) });
     }
   }
   return cards;
 }
 
-export async function moveCard(root: string, card: Card, lane: Lane): Promise<Card> {
+/** Called only under the controller's mutation lock. No dispatch or acceptance. */
+export async function reconcileBoard(root: string): Promise<Card[]> {
+  const cards = await observeBoard(root);
+  for (const card of planIntake(cards)) {
+    if (digest(await textFile(cardPath(root, card), 131_072)) !== card.digest) {
+      throw new FactoryError("CARD_CHANGED", "The card changed before reconciliation. Let the editor finish and reconcile again.");
+    }
+    await replaceText(cardPath(root, card), `<!-- factory:${randomUUID()} -->\n${card.text}`);
+  }
+  const reconciled = await observeBoard(root);
+  if (reconciled.some(card => card.id === null)) {
+    throw new FactoryError("CARD_CHANGED", "New task material appeared during reconciliation. Reconcile again before execution.");
+  }
+  return reconciled as Card[];
+}
+
+export async function moveCard(root: string, card: ObservedCard, lane: Lane): Promise<ObservedCard> {
   const source = cardPath(root, card);
   const target = cardPath(root, { ...card, lane });
   if (digest(await textFile(source, 131_072)) !== card.digest) {

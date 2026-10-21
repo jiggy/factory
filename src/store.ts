@@ -3,8 +3,9 @@ import { unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type { Prepared } from "@jigging/jig/client";
 import type { Card } from "./board.ts";
-import { directory, entries, exists, record, syncDirectory, textFile } from "./files.ts";
+import { directory, entries, exists, isMissing, record, requireDirectory, syncDirectory, textFile } from "./files.ts";
 import { FactoryError } from "./errors.ts";
+import type { AttemptFacts, Decision } from "./analysis.ts";
 
 export interface Transaction {
   version: 1;
@@ -44,7 +45,10 @@ export class Store {
     await record(join(this.attemptPath(transaction.attemptId), "transaction.json"), transaction);
   }
   async transactions(): Promise<Transaction[]> {
-    await this.init();
+    if (!(await exists(this.privateRoot))) return [];
+    await requireDirectory(this.privateRoot, true);
+    if (!(await exists(join(this.privateRoot, "attempts")))) return [];
+    await requireDirectory(join(this.privateRoot, "attempts"), true);
     const result: Transaction[] = [];
     for (const id of await entries(join(this.privateRoot, "attempts"))) {
       const path = join(this.attemptPath(id), "transaction.json");
@@ -63,6 +67,41 @@ export class Store {
       throw new FactoryError("INVALID_TRANSACTION_ORDER", "Attempt history has missing or duplicate sequence facts. Preserve evidence; do not replay.");
     }
     return result;
+  }
+  async facts(): Promise<AttemptFacts[]> {
+    const facts: AttemptFacts[] = [];
+    for (const transaction of await this.transactions()) {
+      const id = transaction.attemptId;
+      const [hasDecision, hasAcceptance, requeued] = await Promise.all([
+        this.has(id, "disposition.json"), this.has(id, "acceptance.json"), this.has(id, "requeue.json"),
+      ]);
+      const [decision, acceptance] = await Promise.all([
+        hasDecision ? this.read<Decision>(id, "disposition.json") : undefined,
+        hasAcceptance ? this.read<{ taskDigest: string }>(id, "acceptance.json") : undefined,
+      ]);
+      facts.push({
+        sequence: transaction.sequence, attemptId: id,
+        task: { id: transaction.task.id, name: transaction.task.name, digest: transaction.task.digest },
+        ...(decision ? { decision: { taskDigest: decision.taskDigest, disposition: decision.disposition } } : {}),
+        ...(acceptance ? { acceptedDigest: acceptance.taskDigest } : {}),
+        requeued,
+      });
+    }
+    return facts;
+  }
+  async activeController(): Promise<boolean> {
+    let owner: { pid: number };
+    try { owner = JSON.parse(await textFile(join(this.privateRoot, "controller.lock"))) as { pid: number }; }
+    catch (error) { if (isMissing(error)) return false; throw error; }
+    if (!Number.isSafeInteger(owner.pid) || owner.pid <= 0) {
+      throw new FactoryError("INVALID_CONTROLLER_LOCK", "Controller ownership cannot be validated. Preserve state before recovery.");
+    }
+    try { process.kill(owner.pid, 0); return true; }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
+      if ((error as NodeJS.ErrnoException).code === "EPERM") return true;
+      throw error;
+    }
   }
   async has(attemptId: string, name: string) {
     return exists(join(this.attemptPath(attemptId), name));
