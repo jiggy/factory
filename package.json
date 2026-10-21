@@ -7,7 +7,8 @@
     "factory": "bun src/cli.ts",
     "test": "bun test --timeout 60000 test",
     "typecheck": "tsc --noEmit",
-    "qualify": "bun qualification/client.ts"
+    "qualify": "bun qualification/client.ts",
+    "qualify:probe": "bun qualification/probe.ts"
   },
   "dependencies": {
     "@jigging/jig": "0.1.0-alpha.37",

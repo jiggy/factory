@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { AttemptClientError, createAttemptClient, type Prepared, type PrepareRequest } from "@jigging/jig/client";
+import { AttemptClientError, createAttemptClient, type PrepareRequest } from "@jigging/jig/client";
 import { directory, record } from "../src/files.ts";
 import { Controller } from "../src/controller.ts";
+import { FactoryError } from "../src/errors.ts";
+import { qualificationCode } from "./diagnostics.ts";
 
 const project = resolve(import.meta.dir, "project");
 const executable = process.env.JIG_EXECUTABLE ?? resolve(import.meta.dir, "../node_modules/.bin/jig");
@@ -15,14 +17,27 @@ await directory(evidence, true);
 const checks: string[] = [];
 const client = createAttemptClient({ executable, cwd: project });
 const exec = promisify(execFile);
+const dependencies = (JSON.parse(await readFile(resolve(import.meta.dir, "../package.json"), "utf8")) as {
+  dependencies: { "@jigging/jig": string; "@jigging/flow": string };
+}).dependencies;
 let active: Awaited<ReturnType<typeof client.submit>> | undefined;
+let stage = "version";
 const report = (status: string, code?: string) => ({
-  evidence: "installed-public-host", status, jig: "0.1.0-alpha.37", flow: "0.1.0-alpha.15",
+  evidence: "installed-public-host", status, stage,
+  jig: dependencies["@jigging/jig"], flow: dependencies["@jigging/flow"],
+  executableSelection: process.env.JIG_EXECUTABLE ? "operator-selected" : "application-default",
+  artifacts: relative(process.cwd(), evidence),
   checks, ...(code ? { code } : {}), liveAgent: "not-run",
 });
 try {
+  const version = await exec(executable, ["--version"], { maxBuffer: 65_536, timeout: 10_000 });
+  if (version.stdout.trim() !== dependencies["@jigging/jig"]) {
+    throw new FactoryError("QUALIFICATION_VERSION_MISMATCH", "Select the pinned installed Jig executable.");
+  }
+  stage = "review";
   const review = await exec(executable, ["review", "--yes", "--allow-authority-changes"], { cwd: project, maxBuffer: 2_097_152, timeout: 120_000 });
   await writeFile(join(evidence, "review.txt"), review.stdout + review.stderr, { mode: 0o600 });
+  stage = "inspect";
   const inspected = await client.inspect({ target: "flow:flows/echo" }) as { approval: string };
   assert.equal(typeof inspected.approval, "string");
   checks.push("approved target inspection");
@@ -41,9 +56,11 @@ try {
     await record(join(evidence, `prepared-${randomUUID()}.json`), prepared);
     return prepared;
   }
+  stage = "preparation";
   const prepared = await prepare(1_000);
   assert.equal((await client.lookup({ ticket: prepared.ticket })).dispatch, "not-dispatched");
   checks.push("prepare and lookup dispatch no work");
+  stage = "submission";
   active = await client.submit({ ticket: prepared.ticket, request: prepared.canonicalRequest });
   assert.equal(active.role, "owner");
   const observer = await client.submit({ ticket: prepared.ticket, request: prepared.canonicalRequest });
@@ -61,6 +78,7 @@ try {
   active.close(); active = undefined;
   checks.push("duplicate observer, conflict rejection and owner completion");
 
+  stage = "retained-export";
   const retained = await client.result({ ticket: prepared.ticket });
   assert.equal(retained.observation.receipt?.runId, observer.receipt.runId);
   const destination = join(evidence, "final");
@@ -70,6 +88,7 @@ try {
   assert.equal((await client.lookup({ ticket: prepared.ticket })).receipt?.runId, observer.receipt.runId);
   checks.push("retained export and destination collision without re-execution");
 
+  stage = "owner-loss";
   const interrupted = await prepare(60_000);
   active = await client.submit({ ticket: interrupted.ticket, request: interrupted.canonicalRequest });
   for (let i = 0; i < 60; i++) {
@@ -93,6 +112,7 @@ try {
   assert.equal(await readFile(join(checkpointDestination, "files/checkpoint.txt"), "utf8"), "accepted progress\n");
   checks.push("owner loss revokes execution; retained checkpoint exports without resumption");
 
+  stage = "evaluation";
   const iterative = await prepare(0, "binding:iterate", false);
   const iteration = await client.submit({ ticket: iterative.ticket, request: iterative.canonicalRequest });
   active = iteration;
@@ -111,6 +131,7 @@ try {
   iteration.close(); active = undefined;
   checks.push("held candidate → evaluation → revision → evaluation → forwarded artifact");
 
+  stage = "board-workflow";
   const workspace = join(evidence, "workspace");
   const controller = new Controller(workspace, () => client);
   await controller.initialize();
@@ -123,14 +144,11 @@ try {
   await controller.accept(card.id, "Accepted synthetic qualification packet; no software-quality claim.");
   assert.equal((await controller.status())[0]?.lane, "done");
   checks.push("real controller: Markdown → prepared transaction → Run → review → explicit acceptance");
+  stage = "complete";
   await record(join(evidence, "report.json"), report("passed"));
   console.log(JSON.stringify(report("passed"), null, 2));
 } catch (error) {
-  const stderr = error && typeof error === "object" && "stderr" in error && typeof error.stderr === "string"
-    ? error.stderr : "";
-  const knownReviewCode = ["SANDBOX_UNAVAILABLE", "JIG_COMMAND_UNAVAILABLE", "INTERNAL", "PACKAGE_HARDLINK", "PACKAGE_BUN_NODE_MODULES"]
-    .find(code => stderr.includes(`Diagnostic code: ${code}`));
-  const code = error instanceof AttemptClientError ? error.code : knownReviewCode ?? "QUALIFICATION_FAILED";
+  const code = qualificationCode(error);
   // Preserve details privately; never write Prepared/input/tickets to diagnostics.
   await writeFile(join(evidence, "failure.txt"), error instanceof Error ? error.stack ?? error.message : "Unknown failure", { mode: 0o600 });
   await record(join(evidence, "report.json"), report("failed", code));
