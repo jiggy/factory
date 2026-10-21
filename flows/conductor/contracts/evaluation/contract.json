@@ -1,0 +1,93 @@
+{
+  "$schema": "https://flow.jig.md/schemas/invocation-contract-0.schema.json",
+  "id": "https://jig.md/contracts/project-evaluation",
+  "version": "0.1.0",
+  "attachments": { "candidate": "read", "deliverables": "read-write" },
+  "input": { "type": "object", "properties": {}, "additionalProperties": false },
+  "result": {
+    "type": "object",
+    "properties": {
+      "outcome": { "const": "done" },
+      "output": { "$ref": "#/$defs/Evidence" }
+    },
+    "required": ["outcome", "output"],
+    "additionalProperties": false
+  },
+  "$defs": {
+    "Digest": { "type": "string", "minLength": 71, "maxLength": 71 },
+    "Log": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "maxLength": 65536 },
+        "truncated": { "type": "boolean" }
+      },
+      "required": ["text", "truncated"],
+      "additionalProperties": false
+    },
+    "File": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "maxLength": 256 },
+        "bytes": { "type": "integer", "minimum": 0, "maximum": 2097152 },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": ["path", "bytes", "digest"],
+      "additionalProperties": false
+    },
+    "Phase": {
+      "type": "object",
+      "properties": {
+        "phase": { "enum": ["generate", "compile", "test"] },
+        "status": { "enum": ["completed", "failed", "skipped"] },
+        "invocation": { "type": "array", "items": { "type": "string" }, "maxItems": 24 },
+        "exitCode": { "type": ["integer", "null"] },
+        "signal": { "type": ["string", "null"] },
+        "stopReason": {
+          "enum": ["exited", "deadline", "cancelled", "prior-phase-failed", "not-configured"]
+        },
+        "durationMs": { "type": "number", "minimum": 0 },
+        "stdout": { "$ref": "#/$defs/Log" },
+        "stderr": { "$ref": "#/$defs/Log" },
+        "files": { "type": "array", "items": { "$ref": "#/$defs/File" }, "maxItems": 64 }
+      },
+      "required": [
+        "phase",
+        "status",
+        "invocation",
+        "exitCode",
+        "signal",
+        "stopReason",
+        "durationMs",
+        "stdout",
+        "stderr",
+        "files"
+      ],
+      "additionalProperties": false
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "candidateDigest": { "$ref": "#/$defs/Digest" },
+        "recipeDigest": { "$ref": "#/$defs/Digest" },
+        "dependencyDigest": { "$ref": "#/$defs/Digest" },
+        "environmentDigest": { "$ref": "#/$defs/Digest" },
+        "phases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Phase" },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "cleanup": { "const": "complete" }
+      },
+      "required": [
+        "candidateDigest",
+        "recipeDigest",
+        "dependencyDigest",
+        "environmentDigest",
+        "phases",
+        "cleanup"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

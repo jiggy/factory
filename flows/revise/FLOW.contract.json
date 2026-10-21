@@ -1,0 +1,4 @@
+{
+  "$schema": "https://flow.jig.md/schemas/invocation-contract-0.schema.json",
+  "attachments": { "candidate": "read", "deliverables": "read-write" }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "investigate",
+  "description": "Investigate a captured source candidate without modifying it.",
+  "uses": { "agent": { "contract": "./contracts/agent/FLOW.contract.json" } }
+}

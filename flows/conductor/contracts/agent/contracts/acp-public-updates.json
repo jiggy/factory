@@ -1,0 +1,75 @@
+{
+  "$schema": "https://flow.jig.md/schemas/channel-contract-0.schema.json",
+  "id": "https://jig.md/contracts/acp-public-updates",
+  "version": "0.1.0",
+  "semantics": "A bounded projection of an ACP Agent invocation. agent_message_chunk items append public assistant text in received order; an optional messageId identifies the source message, not an invocation. plan items replace the complete current plan. Only text content and plan entries are projected. Thoughts, tools, permissions, credentials and raw ACP messages are excluded. Delivery may fail independently of the Agent result. End of this sequence is not proof that the Agent succeeded. No replay or session control is provided. Conversational calls add turn (0–7) to every item; one-shot calls omit it. Turn identity is application correlation, not authority or proof of native causal ordering.",
+  "item": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "sessionUpdate": {
+            "const": "agent_message_chunk"
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "text"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "text"],
+            "additionalProperties": false
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "turn": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          }
+        },
+        "required": ["sessionUpdate", "content"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "sessionUpdate": {
+            "const": "plan"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "priority": {
+                  "enum": ["high", "medium", "low"]
+                },
+                "status": {
+                  "enum": ["pending", "in_progress", "completed"]
+                }
+              },
+              "required": ["content", "priority", "status"],
+              "additionalProperties": false
+            }
+          },
+          "turn": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          }
+        },
+        "required": ["sessionUpdate", "entries"],
+        "additionalProperties": false
+      }
+    ]
+  }
+}

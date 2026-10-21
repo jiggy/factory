@@ -1,0 +1,5 @@
+{
+  "name": "revise",
+  "description": "Produce a fresh candidate snapshot from bounded source-revision proposals.",
+  "uses": { "agent": { "contract": "./contracts/agent/FLOW.contract.json" } }
+}

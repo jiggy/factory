@@ -1,0 +1,156 @@
+{
+  "$schema": "https://flow.jig.md/schemas/channel-contract-0.schema.json",
+  "id": "https://jig.md/contracts/agent-replies",
+  "version": "0.1.0",
+  "semantics": "Essential direct replies for conversational Agent Run. accepted acknowledges a control, not completed work; result is one settled Agent answer; cancelled settles a cancelled turn without an answer; error reports a settled but invalid answer. rejected performs no requested action. All items are at most 64 KiB; lost, oversized or persistently blocked replies fail the conversation rather than truncate results. End of stream is not native cleanup: await the enclosing invocation.",
+  "item": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "accepted"
+          },
+          "command": {
+            "enum": ["prompt", "interrupt", "close"]
+          },
+          "turn": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          }
+        },
+        "required": ["type", "command", "turn"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "rejected"
+          },
+          "command": {
+            "enum": ["prompt", "interrupt", "close"]
+          },
+          "turn": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "code": {
+            "enum": ["BUSY", "STALE_TURN", "TURN_LIMIT", "INVALID_INPUT", "NOT_RUNNING"]
+          }
+        },
+        "required": ["type", "command", "turn", "code"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "result"
+          },
+          "turn": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "outcome": {
+                    "const": "done"
+                  },
+                  "output": {
+                    "$ref": "#/$defs/AgentOutput"
+                  }
+                },
+                "required": ["outcome", "output"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "outcome": {
+                    "const": "blocked"
+                  },
+                  "output": {
+                    "$ref": "#/$defs/AgentOutput"
+                  }
+                },
+                "required": ["outcome", "output"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "outcome": {
+                    "const": "limit"
+                  },
+                  "output": {
+                    "$ref": "#/$defs/AgentOutput"
+                  }
+                },
+                "required": ["outcome", "output"],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": ["type", "turn", "result"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "cancelled"
+          },
+          "turn": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          }
+        },
+        "required": ["type", "turn"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "error"
+          },
+          "turn": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          },
+          "code": {
+            "const": "INVALID_RESULT"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["type", "turn", "code", "message"],
+        "additionalProperties": false
+      }
+    ]
+  },
+  "$defs": {
+    "AgentOutput": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 8388608
+        },
+        "structured": true
+      },
+      "required": ["text"],
+      "additionalProperties": false
+    }
+  }
+}

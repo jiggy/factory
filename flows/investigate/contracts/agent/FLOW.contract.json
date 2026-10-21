@@ -1,0 +1,241 @@
+{
+  "$schema": "https://flow.jig.md/schemas/invocation-contract-0.schema.json",
+  "id": "https://jig.md/contracts/agent-run",
+  "version": "0.1.0",
+  "features": {
+    "events": "Implements the optional public-update protocol, including honest observation loss.",
+    "conversation": "Implements conversational commands, replies, turn results and final settlement; prompt allowances remain separately granted.",
+    "sessions": "Implements retain/restore requests and final receipts, including run-scoped state and honest unavailability; authority and successful retention are separate."
+  },
+  "input": {
+    "$ref": "#/$defs/RunInput"
+  },
+  "result": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "const": "done"
+          },
+          "output": {
+            "$ref": "#/$defs/AgentOutput"
+          }
+        },
+        "required": ["outcome", "output"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "const": "blocked"
+          },
+          "output": {
+            "$ref": "#/$defs/AgentOutput"
+          }
+        },
+        "required": ["outcome", "output"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "const": "limit"
+          },
+          "output": {
+            "$ref": "#/$defs/AgentOutput"
+          }
+        },
+        "required": ["outcome", "output"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "const": "done"
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "session": {
+                "$ref": "#/$defs/SessionReceipt"
+              },
+              "turns": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              }
+            },
+            "required": ["turns"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["outcome", "output"],
+        "additionalProperties": false
+      }
+    ]
+  },
+  "outcomes": {
+    "blocked": "The Agent completed its bounded response but reported that the requested work is blocked.",
+    "limit": "The Agent completed its bounded response but reported an Agent limit; host deadline and cancellation remain operational failures."
+  },
+  "channels": {
+    "events": {
+      "direction": "send",
+      "required": false,
+      "contract": "./contracts/acp-public-updates.json"
+    },
+    "commands": {
+      "direction": "receive",
+      "required": false,
+      "delivery": "direct",
+      "contract": "./contracts/agent-commands.json"
+    },
+    "replies": {
+      "direction": "send",
+      "required": false,
+      "delivery": "direct",
+      "contract": "./contracts/agent-replies.json"
+    }
+  },
+  "$defs": {
+    "SessionRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": { "retain": { "const": true }, "lifetime": { "const": "run" } },
+          "required": ["retain"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "restore": { "type": "string", "minLength": 36, "maxLength": 36 }
+          },
+          "required": ["restore"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SessionReceipt": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": { "const": "retained" },
+            "reference": { "type": "string", "minLength": 36, "maxLength": 36 }
+          },
+          "required": ["status", "reference"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": { "const": "unavailable" },
+            "reason": {
+              "enum": ["not-cleanly-closed", "missing-history", "unsupported-history", "capacity"]
+            }
+          },
+          "required": ["status", "reason"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "RunInput": {
+      "type": "object",
+      "properties": {
+        "instructions": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "skills": {
+          "$ref": "#/$defs/SkillContents"
+        },
+        "responseSchema": {
+          "type": "object"
+        },
+        "guidance": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": ["label", "text"],
+            "additionalProperties": false
+          }
+        },
+        "conversation": {
+          "const": true
+        },
+        "session": {
+          "$ref": "#/$defs/SessionRequest"
+        }
+      },
+      "required": ["instructions"],
+      "additionalProperties": false
+    },
+    "AgentOutput": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 8388608
+        },
+        "structured": true,
+        "session": {
+          "$ref": "#/$defs/SessionReceipt"
+        }
+      },
+      "required": ["text"],
+      "additionalProperties": false
+    },
+    "SkillContents": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "files": {
+            "type": "array",
+            "maxItems": 1024,
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 1048576
+                }
+              },
+              "required": ["path", "text"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["name", "files"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

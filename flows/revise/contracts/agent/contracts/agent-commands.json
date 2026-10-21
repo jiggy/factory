@@ -1,0 +1,73 @@
+{
+  "$schema": "https://flow.jig.md/schemas/channel-contract-0.schema.json",
+  "id": "https://jig.md/contracts/agent-commands",
+  "version": "0.1.0",
+  "semantics": "Direct controls for an explicitly conversational Agent Run. Initial invocation input starts turn 0. Prompt names the next sequential turn; interrupt names the running turn; close names the last settled turn. Controls are accepted or rejected separately from turn settlement and final invocation cleanup. Delivery is not dispatch or completion. No automatic queue or replay.",
+  "item": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "prompt"
+          },
+          "turn": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          },
+          "input": {
+            "type": "object",
+            "properties": {
+              "instructions": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1048576
+              },
+              "responseSchema": {
+                "type": "object"
+              },
+              "guidance": {
+                "type": "array",
+                "maxItems": 64,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["label", "text"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["instructions"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["type", "turn", "input"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": ["interrupt", "close"]
+          },
+          "turn": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          }
+        },
+        "required": ["type", "turn"],
+        "additionalProperties": false
+      }
+    ]
+  }
+}

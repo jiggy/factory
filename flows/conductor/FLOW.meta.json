@@ -1,0 +1,11 @@
+{
+  "name": "factory-conductor",
+  "description": "Select and apply reviewed techniques adaptively in one bounded work episode.",
+  "uses": {
+    "agent": { "contract": "./contracts/agent/FLOW.contract.json" },
+    "investigate": {},
+    "revise": {},
+    "evaluate": { "contract": "./contracts/evaluation/contract.json" },
+    "checkpoint": { "contract": "./contracts/checkpoint/contract.json" }
+  }
+}
