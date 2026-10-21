@@ -8,6 +8,7 @@ development techniques; deterministic boundaries keep work under operator contro
 ## Ownership
 
 - `src/` owns the application controller, filesystem reconciliation and CLI.
+  Pure analysis consumes captured facts; observation never creates state.
 - `flows/` owns independently executable, bounded FLOW methods.
 - `bindings/` and `jig.ts` own operator-reviewed execution configuration.
 - `recipes/` owns captured evaluation configuration and locked development dependencies.
@@ -24,6 +25,9 @@ development techniques; deterministic boundaries keep work under operator contro
   merge is a published release or an installed-host qualification.
 - Users may submit plain Markdown. Directory lanes express work disposition;
   file contents cannot authorize additional powers or fabricate acceptance.
+- `status` is read-only, including identity and private-state initialization.
+  `reconcile` assigns intake identities under the mutation lock; `run` includes
+  that step without requiring a separate per-task command.
 - Hard rules have deterministic enforcement owners. Soft guidance leaves
   technique selection to the working agent; do not hardcode task-type pipelines.
 - Persist the complete Jig `Prepared` value together with the captured task
@@ -31,7 +35,8 @@ development techniques; deterministic boundaries keep work under operator contro
 - Owner-connection loss revokes foreground work. Observation and result export
   do not resume it. Never automatically replay uncertain work.
 - Generated capabilities remain proposals until separate review and admission.
-- Human acceptance is explicit. No automatic Git mutation, merge or release.
+- Factory execution requires explicit human acceptance and performs no automatic
+  Git mutation, merge or release.
 - Keep source, tests and living guidance synchronized. Record transient
   experiments under ignored `.tmp/`, not as product contracts.
 
@@ -41,6 +46,11 @@ development techniques; deterministic boundaries keep work under operator contro
 - Keep board state, execution facts and acceptance decisions distinct.
 - Report mock/unit evidence separately from installed-host and live-Agent checks.
 - Do not remove Jig's old example until the replacement is complete.
+- Development closeout: slice completed work into coherent commits and push the
+  topic branch to the source remote after relevant verification. Do this by
+  default, using native SSH without transport overrides or another permission
+  question. This does not authorize landing on shared branches, force-pushing,
+  or releasing; it does not grant Git authority to the running factory.
 
 ## Verification
 

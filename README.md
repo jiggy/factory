@@ -87,9 +87,18 @@ bun run factory run ./workspace
 bun run factory status ./workspace
 ```
 
-`status` assigns identities to new inbox/ready cards and reports discrepancies.
-The controller claims one ready card in filename order. It is deliberately a
-one-episode command, not a background watcher or automatic retry service.
+`status` is read-only: new cards appear with `id: null` and an intake notice.
+It creates no directories, takes no mutation lock and can observe active work.
+To assign identities without starting work, use:
+
+```sh
+bun run factory reconcile ./workspace
+```
+
+`run` also performs intake reconciliation under its mutation lock, so plain
+Markdown in `ready` needs no separate setup command. The controller claims one
+ready card in filename order. It is deliberately a one-episode command, not a
+background watcher or automatic retry service.
 
 Techniques are **not** a mandatory pipeline. The working agent can investigate,
 revise, evaluate, ask, or finish; it cannot invent targets or enlarge its grants.

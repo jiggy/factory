@@ -17,6 +17,10 @@ controller state machine.
 
 The application imports `@jigging/jig/client`; methods import `@jigging/flow`.
 No code imports a sibling checkout, the old factory example or Jig internals.
+Pure board diagnosis and intake planning live in `src/analysis.ts`; they consume
+captured facts without filesystem, host or mutation capabilities. These remain
+ordinary functions until independently reusable method packaging earns its cost.
+Filesystem adapters observe and commit; the controller owns execution and authority.
 
 ## Board and execution facts are different
 
@@ -30,14 +34,26 @@ captured task, full Prepared, claim, dispatch intent, host receipts,
 observations, disposition decisions, acceptance and requeue authorizations.
 Attempt sequence numbers order history independently of wall-clock timestamps.
 A physical manual move does not prove execution, cancellation or acceptance.
-`status` exposes discrepancies; uncertain attempts must be recovered first.
+`status` only observes: it never creates state, assigns IDs, acquires the mutation
+lock or contacts Jig. It reports unidentified Markdown with `id: null` and remains
+available while a work episode owns the controller lock. Diagnosis receives a
+minimal projection of attempt facts, never prepared tickets or captured task text.
+Observations are not an atomic snapshot across editor and controller writes;
+incomplete or changing records may require another observation, never a replay.
+
+`reconcile` explicitly assigns identities to nonempty inbox/ready cards under
+the mutation lock. It validates the full intake plan before writes and rechecks
+each captured card digest before assignment. Reconciliation is repeatable but
+not a multi-card transaction. `run` includes the same intake step before claiming
+work, so users do not need a new per-task ceremony. Neither analysis nor intake
+grants execution or acceptance. Uncertain attempts must be recovered first.
 The current implementation reports invalid manual moves rather than silently
 repairing or interpreting every possible drag-and-drop command.
 
 ## Durable boundary
 
 1. Lock one workspace controller.
-2. Read a stable ready card and approved operator configuration.
+2. Reconcile intake, then read a stable ready card and approved operator configuration.
 3. Inspect the exact target and prepare immutable input without dispatch.
 4. Persist full Prepared and task snapshot in one exclusive durable record.
 5. Record claim intent, move to doing, and record the committed claim.
