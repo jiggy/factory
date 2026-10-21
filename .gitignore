@@ -1,0 +1,8 @@
+node_modules/
+.factory/
+.jig/
+jig.lock
+.tmp/
+.env
+.env.*
+!.env.example
