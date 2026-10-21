@@ -11,7 +11,7 @@
     "qualify:probe": "bun qualification/probe.ts"
   },
   "dependencies": {
-    "@jigging/jig": "0.1.0-alpha.37",
+    "@jigging/jig": "0.1.0-alpha.38",
     "@jigging/flow": "0.1.0-alpha.15",
     "@jigging/agent-acp": "0.1.0-alpha.11"
   },
