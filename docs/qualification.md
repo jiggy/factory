@@ -8,7 +8,8 @@ bun run test
 ```
 
 Tests use a clearly labelled fake execution client and scripted Flow contexts.
-Pure analysis tests exercise captured board/attempt facts without I/O. Controller
+Pure analysis tests exercise captured board/attempt facts without I/O. Package
+boundary tests prevent reliance on ambient application SDK installations. Controller
 tests verify read-only status (including active ownership and missing state),
 explicit identity reconciliation, durability ordering, card revisions, human
 acceptance, duplicate claims and recovery without submission. Scripted Flow
@@ -20,6 +21,33 @@ The test timeout accommodates filesystem sync costs on slow worktrees; it does
 not disable durable writes.
 
 ## Installed public-host checks
+
+Start with the minimal public baseline if review or startup fails:
+
+```sh
+bun run qualify:probe
+```
+
+This checks the pinned installed version, calls its ordinary `jig init`, reviews
+the unmodified generated source, and runs the code-only greeting. It explicitly
+permits dependency resolution for that public template. It neither reads
+application task data nor selects an Agent. Reports and command output are
+private under `.tmp/host-probe-<id>/`.
+
+A passing baseline establishes only that this simple installed path works.
+It does not establish execution-client ownership, artifact composition, project
+evaluation or factory behavior. If the baseline passes and the full suite fails,
+report both observations and the failed stage. Do not remove capabilities from
+the fixture or weaken enforcement to make its result green.
+Keep every repeated probe's evidence: mixed passing/failing runs are an
+intermittent failure, not a qualified baseline.
+
+For an upstream handoff, include the source commit, exact package pins, baseline
+and full-suite reports, selected host-tool configuration and the full suite's
+failed stage. Reports distinguish the application-default executable from an
+explicit `JIG_EXECUTABLE` selection. Review its privately retained command output
+before sharing; never share prepared transaction files or tickets. A generic
+review error does not identify a faulty capability or establish a root cause.
 
 Install the qualification project's pinned packages with copied files. The
 evaluation recipe's lock is included: do not install `node_modules`
@@ -43,7 +71,9 @@ evaluation authority. It exercises only installed public entrypoints:
 - actual nonzero/zero test-exit evidence;
 - controller-driven Markdown → review → explicit human acceptance.
 
-Reports and raw failure details are retained privately under
+Reports identify the failed stage and preserve known public codes, including
+`PROJECT_EVALUATOR_LAUNCH`. That refusal says no Flow started; it does not prove
+the underlying host cause. Reports and raw failure details are retained privately under
 `.tmp/qualification-<id>/`. Safe stdout summaries list completed checks, not
 tickets, source requests or private exceptions. A failure before a check
 finishes is not a passing qualification.

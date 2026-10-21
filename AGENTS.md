@@ -9,7 +9,9 @@ development techniques; deterministic boundaries keep work under operator contro
 
 - `src/` owns the application controller, filesystem reconciliation and CLI.
   Pure analysis consumes captured facts; observation never creates state.
-- `flows/` owns independently executable, bounded FLOW methods.
+- `flows/` owns independently executable, bounded FLOW methods. Each importing
+  code Flow declares its SDK/runtime dependencies and lock in its own package;
+  application-root dependencies do not supply a Flow's execution closure.
 - `bindings/` and `jig.ts` own operator-reviewed execution configuration.
 - `recipes/` owns captured evaluation configuration and locked development dependencies.
 - `test/` owns application tests. `qualification/` owns public-client host checks.
@@ -60,6 +62,8 @@ is separate and must use installed public packages on a supported host.
 - `bun run typecheck` checks controller, Flow and qualification source.
 - `bun run test` checks application behavior with labelled test doubles.
 - `bun run qualify` checks the installed host; it is not a live-Agent test.
+- `bun run qualify:probe` checks the unmodified installed greeting template;
+  passing that baseline does not qualify artifacts, evaluation or Agent work.
 
 ----------------------------
 
