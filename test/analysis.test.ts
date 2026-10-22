@@ -54,3 +54,15 @@ test("missing cards retain an explicit diagnostic without reconstructing the boa
 test("explicitly requeued work is not misreported as awaiting requeue", () => {
   expect(diagnoseBoard([card({ lane: "ready" })], [attempt({ requeued: true })])[0]!.attention).toBeUndefined();
 });
+
+test("requeue diagnosis retains attention for a changed task revision", () => {
+  const [row] = diagnoseBoard([card({ lane: "ready", digest: "revision-2" })], [attempt({ requeued: true })]);
+  expect(row!.attention).toContain("Card edited since execution");
+});
+
+test("requeue diagnosis retains attention for a mismatched decision revision", () => {
+  const [row] = diagnoseBoard([card({ lane: "ready" })], [attempt({
+    requeued: true, decision: { taskDigest: "different-revision", disposition: "review" },
+  })]);
+  expect(row!.attention).toContain("Recorded decision does not match");
+});

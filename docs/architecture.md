@@ -43,12 +43,18 @@ incomplete or changing records may require another observation, never a replay.
 
 `reconcile` explicitly assigns identities to nonempty inbox/ready cards under
 the mutation lock. It validates the full intake plan before writes and rechecks
-each captured card digest before assignment. Reconciliation is repeatable but
-not a multi-card transaction. `run` includes the same intake step before claiming
+each captured card digest before assignment. Its returned diagnosis runs after
+that temporary lock is released, so it does not report itself as an active owner.
+Reconciliation is repeatable but not a multi-card transaction.
+`run` includes the same intake step before claiming
 work, so users do not need a new per-task ceremony. Neither analysis nor intake
 grants execution or acceptance. Uncertain attempts must be recovered first.
 The current implementation reports invalid manual moves rather than silently
 repairing or interpreting every possible drag-and-drop command.
+
+Requeue can clear the prior-attempt attention only when the captured task and
+decision digests match the current card. A later edit remains visible as a
+revision mismatch even while the card stays in ready.
 
 ## Durable boundary
 
