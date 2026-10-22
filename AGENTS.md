@@ -29,7 +29,9 @@ development techniques; deterministic boundaries keep work under operator contro
   file contents cannot authorize additional powers or fabricate acceptance.
 - `status` is read-only, including identity and private-state initialization.
   `reconcile` assigns intake identities under the mutation lock; `run` includes
-  that step without requiring a separate per-task command.
+  that step without requiring a separate per-task command. Reconciliation
+  diagnoses the board after releasing its temporary lock. Requeue never
+  suppresses task or decision revision mismatches in board diagnosis.
 - Hard rules have deterministic enforcement owners. Soft guidance leaves
   technique selection to the working agent; do not hardcode task-type pipelines.
 - Persist the complete Jig `Prepared` value together with the captured task

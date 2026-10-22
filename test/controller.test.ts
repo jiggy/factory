@@ -220,6 +220,18 @@ describe("file-native controller (mock host, not host qualification)", () => {
     expect((await controller.status())[0]!.lane).toBe("review");
   });
 
+  test("reconciliation reports recovery after releasing its temporary mutation lock", async () => {
+    const { root, host, controller } = await fixture();
+    host.failSubmit = true;
+    await expect(controller.run()).rejects.toThrow();
+    const rows = await controller.reconcile();
+    expect(rows[0]!.attention).toContain("observational recovery");
+    expect(rows).toEqual(await controller.status());
+    expect(await exists(join(root, ".factory/controller.lock"))).toBe(false);
+    expect(host.submissions).toBe(1);
+    expect(host.lookups).toBe(0);
+  });
+
   test("unknown execution prevents both recovery replay and new work", async () => {
     const { host, controller } = await fixture();
     host.failSubmit = true;
@@ -255,6 +267,20 @@ describe("file-native controller (mock host, not host qualification)", () => {
     await controller.requeue(card!.id!, "Authorize a new bounded attempt.");
     await controller.run();
     expect(host.submissions).toBe(2);
+  });
+
+  test("requeue diagnosis reports a later edit while the card remains ready", async () => {
+    const { root, controller, host } = await fixture();
+    await controller.run();
+    const [card] = await controller.status();
+    await controller.requeue(card!.id!, "Authorize another bounded attempt.");
+    expect((await controller.status())[0]!.attention).toBeUndefined();
+    const path = join(root, "board/ready/task.md");
+    await writeFile(path, `${await readFile(path, "utf8")}\nChanged after requeue.\n`);
+    const [edited] = await controller.status();
+    expect(edited!.lane).toBe("ready");
+    expect(edited!.attention).toContain("Card edited since execution");
+    expect(host.submissions).toBe(1);
   });
 
   test("duplicate card identity blocks dispatch", async () => {

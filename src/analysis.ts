@@ -60,9 +60,9 @@ function attention(card: ObservedCard, attempt: AttemptFacts | undefined, contro
       ? "Controller owns this workspace; attempt has not settled."
       : "Attempt requires observational recovery before any new execution.";
   }
-  if (card.lane === "ready" && attempt.requeued) return undefined;
   if (attempt.task.digest !== card.digest) return "Card edited since execution; retain old evidence and explicitly requeue.";
   if (attempt.decision.taskDigest !== card.digest) return "Recorded decision does not match this task revision; inspect retained evidence.";
+  if (card.lane === "ready" && attempt.requeued) return undefined;
   if (card.lane === "done") {
     return attempt.acceptedDigest === card.digest ? undefined : "A manual move cannot manufacture human acceptance.";
   }

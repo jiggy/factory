@@ -42,10 +42,10 @@ export class Controller {
   }
 
   async reconcile(): Promise<BoardRow[]> {
-    return this.store.locked(async () => {
+    await this.store.locked(async () => {
       await reconcileBoard(this.root);
-      return this.status();
     });
+    return this.status();
   }
 
   /** One ready card, one foreground episode. Never retries or automatically loops. */
