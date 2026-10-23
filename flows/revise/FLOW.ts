@@ -1,4 +1,4 @@
-import { handle } from "@jigging/flow";
-import { revise } from "./revise.ts";
+import { handle } from '@jigging/flow'
+import { revise } from './revise.ts'
 
-await handle(revise);
+await handle(revise)

@@ -11,5 +11,12 @@
     "types": ["bun"],
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "qualification/**/*.ts", "flows/**/*.ts", "bindings/**/*.ts", "jig.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "qualification/**/*.ts",
+    "flows/**/*.ts",
+    "bindings/**/*.ts",
+    "jig.ts"
+  ]
 }

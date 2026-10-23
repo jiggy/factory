@@ -1,6 +1,6 @@
-import { defineBinding } from "@jigging/jig";
+import { defineBinding } from '@jigging/jig'
 
 export default defineBinding({
-  package: "./flows/investigate",
-  slots: { agent: "binding:agent" },
-});
+  package: './flows/investigate',
+  slots: { agent: 'binding:agent' },
+})

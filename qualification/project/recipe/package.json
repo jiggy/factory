@@ -2,5 +2,7 @@
   "name": "factory-qualification-recipe",
   "private": true,
   "type": "module",
-  "devDependencies": { "typescript": "5.7.3" }
+  "devDependencies": {
+    "typescript": "5.7.3"
+  }
 }
