@@ -8,11 +8,10 @@
     "test": "bun test --timeout 60000 test",
     "typecheck": "tsc --noEmit",
     "qualify": "bun qualification/client.ts",
-    "qualify:probe": "bun qualification/probe.ts"
-
+    "qualify:probe": "bun qualification/probe.ts",
     "check": "tsc --noEmit",
     "format": "biome format --write .",
-    "format:check": "biome format .",
+    "format:check": "biome format ."
   },
   "dependencies": {
     "@jigging/jig": "0.1.0-alpha.38",
