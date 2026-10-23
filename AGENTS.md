@@ -62,6 +62,7 @@ development techniques; deterministic boundaries keep work under operator contro
 
 The package scripts own repeatable tests and type checking. Host qualification
 is separate and must use installed public packages on a supported host.
+CI runs `format:check`, `check` and `test`; it does not qualify the installed host.
 
 - `bun run typecheck` checks controller, Flow and qualification source.
 - `bun run test` checks application behavior with labelled test doubles.

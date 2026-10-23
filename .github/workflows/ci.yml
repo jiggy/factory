@@ -105,7 +105,6 @@ jobs:
       - run: bun run format:check
       - run: bun run check
       - run: bun run test
-      - run: bun run demo
 
   report-formatting-check:
     needs: [apply-formatting, verify]
