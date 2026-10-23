@@ -1,7 +1,7 @@
-import { defineJig, discover } from "@jigging/jig";
+import { defineJig, discover } from '@jigging/jig'
 
 export default defineJig({
-  flows: discover("./flows"),
-  bindings: discover("./bindings"),
-  entrypoint: "binding:factory",
-});
+  flows: discover('./flows'),
+  bindings: discover('./bindings'),
+  entrypoint: 'binding:factory',
+})
