@@ -34,9 +34,14 @@ startup.
 Select the Agent client/model in `bindings/agent.ts` and authenticate it outside
 this repository. The supplied client selection is Codex, not a platform default.
 Inspect `bindings/factory.ts` and `recipes/typescript/` before granting authority.
-The recipe compiles `src/**/*.ts` and runs `test/project.test.ts`; customize and
-review it for your project. Recipe directories contain configuration and locks,
+The recipe runs `test/project.test.ts` and declares its locked TypeScript and Bun
+test types. The native compiler profile selects source, tools, tests and generated
+TypeScript and owns output paths. Keep the recipe compiler configuration within
+that profile: do not add `include`, `rootDir` or `outDir`. Customize and review the
+recipe for your project. Recipe directories contain configuration and locks,
 not installed `node_modules`.
+The supplied recipes strictly check candidate source but skip rechecking locked
+dependency declaration files (`skipLibCheck`); test assertions still execute.
 
 ```sh
 bunx --no-install jig review --yes --allow-authority-changes
