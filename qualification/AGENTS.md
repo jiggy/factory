@@ -21,9 +21,15 @@ Test installed public Jig/FLOW boundaries independently of unit-test doubles.
 - Persist full Prepared values before submission. Never log tickets or requests.
 - A host refusal is a failed qualification, not permission to substitute mocks.
 - Keep reports and execution state under ignored `.tmp/` or `.jig/`.
+- Recipe compiler configuration follows the native fixed file policy. Declare
+  Bun test types in the recipe's locked development dependencies.
+- Strict candidate compilation skips locked dependency declaration checks,
+  matching the application recipe; all candidate test assertions still run.
 - Never enable weaker containment or retry an uncertain execution.
 - Keep baseline template success separate from full client/evaluation success.
   Do not remove a failing fixture capability to manufacture a passing result.
+- Export collision checks use an unrelated existing directory and preserve its
+  sentinel. Repeating an already delivered export is not collision evidence.
 
 ## Work guidance
 
