@@ -14,9 +14,9 @@
     "format:check": "biome format ."
   },
   "dependencies": {
-    "@jigging/jig": "0.1.0-alpha.38",
+    "@jigging/jig": "0.1.0-alpha.42",
     "@jigging/flow": "0.1.0-alpha.15",
-    "@jigging/agent-acp": "0.1.0-alpha.11"
+    "@jigging/agent-acp": "0.1.0-alpha.12"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
