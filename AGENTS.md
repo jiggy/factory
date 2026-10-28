@@ -14,6 +14,8 @@ development techniques; deterministic boundaries keep work under operator contro
   application-root dependencies do not supply a Flow's execution closure.
 - `bindings/` and `jig.ts` own operator-reviewed execution configuration.
 - `recipes/` owns captured evaluation configuration and locked development dependencies.
+  Recipe compiler configuration does not override native source/output paths.
+  Bun test types are explicit locked recipe dependencies, not ambient application inputs.
 - `test/` owns application tests. `qualification/` owns public-client host checks.
 - `docs/` owns current architecture, boundaries and operating instructions.
 - A workspace's `board/` is its visible work interface. Its private `.factory/`
