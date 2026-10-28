@@ -113,9 +113,26 @@ try {
     artifactResult: 'candidate',
   })
   assert.equal(await readFile(join(destination, 'files/note.txt'), 'utf8'), 'immutable input\n')
+  const collision = join(evidence, 'existing-destination')
+  await mkdir(collision)
+  await writeFile(join(collision, 'sentinel.txt'), 'preserve existing bytes\n')
   await assert.rejects(
-    client.export({ ticket: prepared.ticket, destination, artifactResult: 'candidate' }),
+    client.export({
+      ticket: prepared.ticket,
+      destination: collision,
+      artifactResult: 'candidate',
+    }),
+    (error) =>
+      error instanceof AttemptClientError && error.operation === 'export' && !error.uncertain,
   )
+  assert.equal(await readFile(join(collision, 'sentinel.txt'), 'utf8'), 'preserve existing bytes\n')
+  const afterCollision = join(evidence, 'final-after-collision')
+  await client.export({
+    ticket: prepared.ticket,
+    destination: afterCollision,
+    artifactResult: 'candidate',
+  })
+  assert.equal(await readFile(join(afterCollision, 'files/note.txt'), 'utf8'), 'immutable input\n')
   assert.equal(
     (await client.lookup({ ticket: prepared.ticket })).receipt?.runId,
     observer.receipt.runId,
